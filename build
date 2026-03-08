@@ -14,7 +14,12 @@ cleanup()
 trap cleanup EXIT
 
 # Put temp directory in /var/tmp to guarantee enough space.
-tmp=$(mktemp -d --tmpdir -p /var/tmp dcdib.XXX)
+# Use TMPDIR on macOS, /var/tmp on Linux
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    tmp=$(mktemp -d "${TMPDIR:-/var/tmp}/dcdib.XXX")
+else
+    tmp=$(mktemp -d --tmpdir -p /var/tmp dcdib.XXX)
+fi
 
 set -e
 arch=$(uname -m)
@@ -26,7 +31,7 @@ if [ "$1" == "clean" ]; then
     exit 0
 fi
 
-if command -v apt > /dev/null 2>&1; then
+if command -v apt-get > /dev/null 2>&1; then
     echo "APT package manager detected for build dependencies, sudo is required to install them:"
     sudo apt update
     sudo apt install --yes build-essential cmake patchelf zip

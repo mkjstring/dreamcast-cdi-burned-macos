@@ -67,14 +67,19 @@ if [ ! -f ""$(dirname "$0")"/config/burner.txt" ]; then
     chmod -R 777 "$(dirname "$0")"/config
 fi
 
-burner=$(cat config/burner.txt)
+burner=$(cat "$(dirname "$0")"/config/burner.txt)
 echo -e "\nBurner: $burner"
 
-burn_speed=$(cat config/burn-speed.txt)
+burn_speed=$(cat "$(dirname "$0")"/config/burn-speed.txt)
 echo -e "\nBurn speed: "$burn_speed"x"
 
 # Put temp directory in /var/tmp to guarantee enough space.
-tmp=$(mktemp -d --tmpdir -p /var/tmp dcdib.XXX)
+# Use TMPDIR on macOS, /var/tmp on Linux
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    tmp=$(mktemp -d "${TMPDIR:-/var/tmp}/dcdib.XXX")
+else
+    tmp=$(mktemp -d --tmpdir -p /var/tmp dcdib.XXX)
+fi
 
 # When this script exits, automatically delete the temp directory.
 cleanup() 
