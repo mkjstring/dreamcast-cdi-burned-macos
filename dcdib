@@ -4,14 +4,10 @@ version="v1.1.1"
 
 unmount_cd ()
 {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        : # Blank discs are not mounted; diskarbitrationd is stopped during burn
-    else
-        ( pumount cdrom ||              # Easiest
-              umount /media/cdrom ||        # Most common
-              umount /mnt/cdrom             # For old systems
-        )> /dev/null 2>&1  || true
-    fi
+    ( pumount cdrom ||              # Easiest
+          umount /media/cdrom ||        # Most common
+          umount /mnt/cdrom             # For old systems
+    )> /dev/null 2>&1  || true
 }
 
 macos_stop_diskarbitrationd ()
@@ -28,7 +24,6 @@ macos_resume_diskarbitrationd ()
     fi
 }
 
-
 echo -e "Dreamcast CDI Burner (DCDIB) $version\n(c) 2024, Alex Free (3-BSD)\n"
 
 # Add bundled binaries to PATH using script's own directory, not the working directory.
@@ -40,7 +35,7 @@ if [ $EUID -ne 0 ]; then
 fi
 
 if [ "$#" -ne 1 ] && [ "$#" -ne 2 ]; then
-    echo -e "Error: DCDIB requires 1 or 2 arguments.\n\nUsage:\n\ndcdib <file>       Burn using <file> as input. <file> is either a CDI file OR a supported compressed archive (7z/xz/cab/zip/gzip/bzip2/tar) containing a CDI file.\n\ndcdib -c <file>     Check the self-boot method that <file> uses, without burning. If you have a late rev 1 Sega Dreamcast that can't boot the audio+data self-boot method used by many CDI files, this option can save you from some wasted CD-Rs.\n\ndcdib -s <burn speed>      Set burn speed to <burn speed> and exit.\n\ndcdib -b <burner>      Set burner to <burner> (i.e. \"/dev/sr0\")." 
+    echo -e "Error: DCDIB requires 1 or 2 arguments.\n\nUsage:\n\ndcdib <file>       Burn using <file> as input. <file> is either a CDI file OR a supported compressed archive (7z/xz/cab/zip/gzip/bzip2/tar) containing a CDI file.\n\ndcdib -c <file>     Check the self-boot method that <file> uses, without burning. If you have a late rev 1 Sega Dreamcast that can't boot the audio+data self-boot method used by many CDI files, this option can save you from some wasted CD-Rs.\n\ndcdib -s <burn speed>      Set burn speed to <burn speed> and exit.\n\ndcdib -b <burner>      Set burner to <burner> (i.e. \"/dev/sr0\" on Linux, \"1,0,0\" on macOS)."
     exit 1
 fi
 
@@ -58,21 +53,9 @@ if [ $# -eq 2 ]; then
         exit 0
     elif [ "$1" == "-b" ]; then
         mkdir -p "$(dirname "$0")"/config
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            echo "Detecting SCSI bus address..."
-            kill -STOP $(pgrep diskarbitrationd) 2>/dev/null || true
-            scsi_addr=$("$(dirname "$0")"/bin/cdrecord -scanbus 2>/dev/null | grep -E "Removable CD-ROM|Removable DVD" | awk '{print $1}' | head -1)
-            kill -CONT $(pgrep diskarbitrationd) 2>/dev/null || true
-            if [ -z "$scsi_addr" ]; then
-                echo "Could not auto-detect SCSI address, saving $2 directly."
-                scsi_addr="$2"
-            fi
-            echo "$scsi_addr" > "$(dirname "$0")"/config/burner.txt
-        else
-            echo "$2" > "$(dirname "$0")"/config/burner.txt
-        fi
+        echo "$2" > "$(dirname "$0")"/config/burner.txt
         chmod -R 777 "$(dirname "$0")"/config
-        echo "Burner set to \"$(cat "$(dirname "$0")"/config/burner.txt)\""
+        echo "Burner set to \"$2"\"
         exit 0
     elif [ "$1" == "-c" ]; then
         check_only=true
@@ -94,7 +77,7 @@ fi
 if [ ! -f ""$(dirname "$0")"/config/burner.txt" ]; then
     mkdir -p "$(dirname "$0")"/config
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "Burner config not found, setting to default value of 1,0,0 (macOS). Run 'sudo ./dcdib -b <device>' to auto-detect and set your burner (e.g. sudo ./dcdib -b /dev/disk2)."
+        echo "Burner config not found, setting to default value of 1,0,0 (macOS). Run 'cdrecord -scanbus' to find your burner, then set it with: sudo ./dcdib -b <address>"
         echo "1,0,0" > "$(dirname "$0")"/config/burner.txt
     else
         echo "Burner config not found, setting to default value of /dev/sr0"
@@ -177,7 +160,6 @@ if [ -f "$tmp/taudio01.wav" ]; then
     unmount_cd
     macos_stop_diskarbitrationd
     cdrecord -eject -overburn -speed="$burn_speed" -v dev="$burner" -tao -xa $tmp/*.iso
-
 elif [ -f "$tmp/tdata01.iso" ]; then
     echo -e "$1 uses the data+data self-boot method. This disc will self-boot on all rev 0 and rev 1 Sega Dreamcast consoles."
     if [ "$check_only" = true ]; then
@@ -190,7 +172,6 @@ elif [ -f "$tmp/tdata01.iso" ]; then
     unmount_cd
     macos_stop_diskarbitrationd
     cdrecord -eject -overburn -speed="$burn_speed" -v dev="$burner" -tao -xa $tmp/tdata02.iso
-
 else
     echo "Error: failed to Find burn files, nothing has been burned to disc!"
     ls "$tmp"
