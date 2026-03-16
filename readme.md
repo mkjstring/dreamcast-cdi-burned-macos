@@ -78,34 +78,60 @@ If you are still having issues booting even high quality CD-Rs on the Sega Dream
 
 # Usage
 
-1) Download and unzip the latest release.
+1) Download and unzip the latest release (or clone and build from source).
 
-2) After inserting a high-quality CD-R disc in your CD-R burner, **ignore any prompts about the new blank CD-R** that your OS may display such as:
+2) **Always run `dcdib` from inside the project/release directory** — it relies on the `bin/` subfolder containing `cdirip`, `cdrecord`, and `7za`.
+
+```bash
+cd /path/to/dreamcast-cdi-burner
+```
+
+3) After inserting a high-quality CD-R disc in your CD-R burner, **ignore any prompts about the new blank CD-R** that your OS may display such as:
 
 ![Fedora new CD prompt](images/fedora-new-cd.png)
 
-3) **Using sudo execute the `dcdib` script in the extracted release directory with 1 or 2 arguments**. Root privileges are required to ensure that buffer under-runs do not occur during burning which would result in a CD-R coaster. Root privileges also ensure that `cdrecord` can access your CD burner hardware successfully to burn the CD-R.
+4) **Run `dcdib` with `sudo`** — root privileges are required to prevent buffer under-runs during burning and to access CD burner hardware.
 
-If your only using one argument, it must be the filepath to either a CDI file OR a supported compressed archive (7z/xz/cab/zip/gzip/bzip2/tar) containing a CDI file.
+### Burn a CDI or archive file
+
+```bash
+sudo ./dcdib "/path/to/game.cdi"
+sudo ./dcdib "/path/to/NFL 2K2 (USA).zip"
+```
+
+`<file>` is either a `.cdi` file **or** a supported compressed archive (`7z`/`xz`/`cab`/`zip`/`gzip`/`bzip2`/`tar`) that contains a CDI file.
 
 ![DCDIB usage 1](images/dcdib-usage-1.png)
 
 ![DCDIB usage 2](images/dcdib-usage-2.png)
 
-If your using 2 arguments:
+### Check self-boot method without burning
 
-`Usage:`
+Use `-c` to identify which self-boot method a CDI uses (no disc required):
 
-`dcdib <file>       Burn using <file> as input. <file> is either a CDI file OR a supported compressed archive (7z/xz/cab/zip/gzip/bzip2/tar) containing a CDI file.`
+```bash
+sudo ./dcdib -c "/path/to/NFL 2K2 (USA).zip"
+```
 
-`dcdib -c <file>        Check the self-boot method that <file> uses, without burning. If you have a late rev 1 Sega Dreamcast that can't boot the audio+data self-boot method used by many CDI files, this option can save you from some wasted CD-Rs.`
+This is especially useful if you have a late rev 1 Dreamcast that can't boot the audio+data method — check before wasting a CD-R.
 
-`dcdib -s <burn speed>       Set burn speed to <burn speed> and exit.`
+### Set burn speed
 
-`dcdib -b <burner>      Set burner to <burner> (i.e. "/dev/sr0").`
+```bash
+sudo ./dcdib -s 8
+```
 
+The speed is saved to `config/burn-speed.txt` and reused on subsequent runs. Default is `1x`.
 
-Note: DCDIB provides a default CD burner config which should work on most if not all Linux distributions (`/dev/sr0`). If you find this to not work on your setup or if you have multiple drives, you can change it. You will know if you need to specify this argument because something like below will be displayed (if you a single burner that isn't at `/dev/sr0`):
+### Set burner device
+
+```bash
+sudo ./dcdib -b /dev/sr1
+```
+
+The burner path is saved to `config/burner.txt` and reused on subsequent runs. Default is `/dev/sr0`.
+
+Note: DCDIB defaults to `/dev/sr0` which works on most Linux systems. If your burner isn't detected or you have multiple drives, change it with `-b`. You will know if you need to specify this argument because something like below will be displayed:
 
 ![DCDIB devname](images/dcdib-devname.png)
 
