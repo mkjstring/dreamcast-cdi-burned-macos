@@ -2,18 +2,37 @@
 
 version="v1.1.1"
 
-unmount_cd () 
+unmount_cd ()
 {
-    ( pumount cdrom ||              # Easiest
-          umount /media/cdrom ||        # Most common
-          umount /mnt/cdrom             # For old systems
-    )> /dev/null 2>&1  || true
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        : # Blank discs are not mounted; diskarbitrationd is stopped during burn
+    else
+        ( pumount cdrom ||              # Easiest
+              umount /media/cdrom ||        # Most common
+              umount /mnt/cdrom             # For old systems
+        )> /dev/null 2>&1  || true
+    fi
 }
+
+macos_stop_diskarbitrationd ()
+{
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        kill -STOP $(pgrep diskarbitrationd) 2>/dev/null || true
+    fi
+}
+
+macos_resume_diskarbitrationd ()
+{
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        kill -CONT $(pgrep diskarbitrationd) 2>/dev/null || true
+    fi
+}
+
 
 echo -e "Dreamcast CDI Burner (DCDIB) $version\n(c) 2024, Alex Free (3-BSD)\n"
 
-# Now that we are sure we are in the directory of this script, we can add all the self-contained binaries we need to the $PATH used within this script.
-PATH="${PWD}/bin"${PATH:+:${PATH}}
+# Add bundled binaries to PATH using script's own directory, not the working directory.
+PATH="$(dirname "$0")/bin"${PATH:+:${PATH}}
 
 if [ $EUID -ne 0 ]; then
     echo "Error: DCDIB requires sudo privileges to ensure that buffer under-runs do not occur when burning to disc, and to ensure successful access to your burning hardware."
@@ -39,10 +58,22 @@ if [ $# -eq 2 ]; then
         exit 0
     elif [ "$1" == "-b" ]; then
         mkdir -p "$(dirname "$0")"/config
-        echo "$2" > "$(dirname "$0")"/config/burner.txt
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            echo "Detecting SCSI bus address..."
+            kill -STOP $(pgrep diskarbitrationd) 2>/dev/null || true
+            scsi_addr=$("$(dirname "$0")"/bin/cdrecord -scanbus 2>/dev/null | grep -E "Removable CD-ROM|Removable DVD" | awk '{print $1}' | head -1)
+            kill -CONT $(pgrep diskarbitrationd) 2>/dev/null || true
+            if [ -z "$scsi_addr" ]; then
+                echo "Could not auto-detect SCSI address, saving $2 directly."
+                scsi_addr="$2"
+            fi
+            echo "$scsi_addr" > "$(dirname "$0")"/config/burner.txt
+        else
+            echo "$2" > "$(dirname "$0")"/config/burner.txt
+        fi
         chmod -R 777 "$(dirname "$0")"/config
-        echo "Burner set to \"$2"\"
-        exit 0 
+        echo "Burner set to \"$(cat "$(dirname "$0")"/config/burner.txt)\""
+        exit 0
     elif [ "$1" == "-c" ]; then
         check_only=true
         set -- "$2" "$1"
@@ -62,8 +93,13 @@ fi
 
 if [ ! -f ""$(dirname "$0")"/config/burner.txt" ]; then
     mkdir -p "$(dirname "$0")"/config
-    echo "Burner config not found, setting to default value of /dev/sr0"
-    echo "/dev/sr0" > "$(dirname "$0")"/config/burner.txt
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "Burner config not found, setting to default value of 1,0,0 (macOS). Run 'sudo ./dcdib -b <device>' to auto-detect and set your burner (e.g. sudo ./dcdib -b /dev/disk2)."
+        echo "1,0,0" > "$(dirname "$0")"/config/burner.txt
+    else
+        echo "Burner config not found, setting to default value of /dev/sr0"
+        echo "/dev/sr0" > "$(dirname "$0")"/config/burner.txt
+    fi
     chmod -R 777 "$(dirname "$0")"/config
 fi
 
@@ -82,11 +118,12 @@ else
 fi
 
 # When this script exits, automatically delete the temp directory.
-cleanup() 
-{ 
+cleanup()
+{
+    macos_resume_diskarbitrationd
     if [[ -e "$tmp" ]]; then
-        echo "Clearing temp files..."  
-        rm -r "$tmp"   
+        echo "Clearing temp files..."
+        rm -r "$tmp"
     fi
 }
 trap cleanup EXIT
@@ -135,9 +172,12 @@ if [ -f "$tmp/taudio01.wav" ]; then
     fi
 
     unmount_cd
+    macos_stop_diskarbitrationd
     cdrecord -speed="$burn_speed" -v dev="$burner" -dao -multi $tmp/*.wav
     unmount_cd
+    macos_stop_diskarbitrationd
     cdrecord -eject -overburn -speed="$burn_speed" -v dev="$burner" -tao -xa $tmp/*.iso
+
 elif [ -f "$tmp/tdata01.iso" ]; then
     echo -e "$1 uses the data+data self-boot method. This disc will self-boot on all rev 0 and rev 1 Sega Dreamcast consoles."
     if [ "$check_only" = true ]; then
@@ -145,9 +185,12 @@ elif [ -f "$tmp/tdata01.iso" ]; then
     fi
 
     unmount_cd
+    macos_stop_diskarbitrationd
     cdrecord -speed="$burn_speed" -v dev="$burner" -tao -multi -xa $tmp/tdata01.iso
     unmount_cd
+    macos_stop_diskarbitrationd
     cdrecord -eject -overburn -speed="$burn_speed" -v dev="$burner" -tao -xa $tmp/tdata02.iso
+
 else
     echo "Error: failed to Find burn files, nothing has been burned to disc!"
     ls "$tmp"

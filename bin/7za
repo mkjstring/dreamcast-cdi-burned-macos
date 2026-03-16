@@ -1,2 +1,21 @@
 #! /bin/sh
-"/usr/local/Cellar/p7zip/17.06/lib/p7zip/7za" "$@"
+# Find 7za or 7z in common locations
+for cmd in \
+    "/opt/homebrew/bin/7za" \
+    "/usr/local/bin/7za" \
+    "/opt/homebrew/bin/7z" \
+    "/usr/local/bin/7z" \
+    "$(which 7za 2>/dev/null)" \
+    "$(which 7z 2>/dev/null)"; do
+    if [ -x "$cmd" ]; then
+        exec "$cmd" "$@"
+    fi
+done
+# Fallback: glob for Homebrew Cellar installs
+for cmd in /usr/local/Cellar/p7zip/*/lib/p7zip/7za /opt/homebrew/Cellar/p7zip/*/lib/p7zip/7za; do
+    if [ -x "$cmd" ]; then
+        exec "$cmd" "$@"
+    fi
+done
+echo "Error: 7za/7z not found. Install p7zip: brew install p7zip" >&2
+exit 1
